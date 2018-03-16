@@ -22,10 +22,11 @@ from datetime import timedelta, datetime
 from math import sin, cos, pi
 from threading import Thread
 import random
-import re
 
 MIN_ACC = 5  # minute accuracy
 YMD = (2018, 1, 1)  # default year month day to always use
+MIN_DEMO = 0
+HOUR_DEMO = 0
 
 if sys.version_info.major == 3:
     from tkinter import *  # python 3
@@ -120,7 +121,7 @@ class makeThread(Thread):
 #  The backgroung image may be changed by pressing key 'i'.
 #  The image path is hardcoded. It should be available in directory 'images'.
 #
-class clock:
+class ClockTest:
     ## Constructor.
     #
     #  @param deltahours time zone.
@@ -129,15 +130,18 @@ class clock:
     #  @param h canvas height.
     #  @param useThread whether to use a separate thread for running the clock.
     #
-    def __init__(self, root, deltahours=0, sImage=True, w=400, h=400, useThread=False, DTG=None):
+    def __init__(self, root, w=400, h=400, useThread=False, **kwargs):
         self.world = [-1, -1, 1, 1]
         self.imgPath = './images/fluminense.png'  # image path
         if hasPIL and os.path.exists(self.imgPath):
-            self.showImage = sImage
+            self.showImage = True
         else:
             self.showImage = False
 
-        self.DTG = DTG
+        self.hour = 0
+        self.minute = 0
+        self.second = 0
+        self.visualize = kwargs.get("visualize", False)
         self.setColors()
         self.circlesize = 0.09
         self._ALL = 'handles'
@@ -149,7 +153,6 @@ class clock:
             self.fluImg = Image.open(self.imgPath)
 
         self.root.bind("<Escape>", lambda _: root.destroy())
-        self.delta = timedelta(hours=deltahours)
         self.canvas = Canvas(root, width=width, height=height, background=self.bgcolor)
         viewport = (self.pad, self.pad, width - self.pad, height - self.pad)
         self.T = mapper(self.world, viewport)
@@ -158,12 +161,17 @@ class clock:
         self.root.bind("<KeyPress-i>", self.toggleImage)
         self.canvas.pack(fill=BOTH, expand=YES)
 
-        if useThread:
-            st = makeThread(self.poll)
-            st.debug = True
-            st.start()
+        if kwargs.get("demo"):
+            # demo is animation with no end in sight
+            self.animate(delay=50)
+
         else:
-            self.poll()
+            if useThread:
+                st = makeThread(self.poll)
+                st.debug = True
+                st.start()
+            else:
+                self.poll()
 
     ## Called when the window changes, by means of a user input.
     #
@@ -209,36 +217,41 @@ class clock:
 
     ## Redraws the whole clock.
     #
-    def redraw(self):
+    def redraw(self, **kwargs):
         start = pi / 2  # 12h is at pi/2
         step = pi / 6
         for i in range(12):  # draw the minute ticks as circles
             angle = start - i * step
             x, y = cos(angle), sin(angle)
             self.paintcircle(x, y)
-        self.painthms()  # draw the handles
+        self.painthms(**kwargs)  # draw the handles
         if not self.showImage:
             self.paintcircle(0, 0)  # draw a circle at the centre of the clock
 
     ## Draws the handles.
     #
     def painthms(self, **kwargs):
+        hour = kwargs.get("hour", self.hour)
+        minute = kwargs.get("minute", self.minute)
+        second = kwargs.get("second", self.second)
         self.canvas.delete(self._ALL)  # delete the handles
-        T = datetime.timetuple((datetime.utcnow() - self.delta) if self.DTG is None else self.DTG)
-        x, x, x, h, m, s, x, x, x = T
         # self.root.title('%02i:%02i:%02i' % (h, m, s))
         if kwargs.get('easy'):
-            m = 0
-        angle = pi / 2 - pi / 6 * (h + m / 60.0)
+            hour_offset = 0
+            second_offset = 0
+        else:
+            hour_offset = minute
+            second_offset = second
+        angle = pi / 2 - pi / 6 * (hour + hour_offset / 60.0)
         x, y = cos(angle) * 0.70, sin(angle) * 0.70
         scl = self.canvas.create_line
         # draw the hour handle
         scl(self.T.windowToViewport(0, 0, x, y), fill=self.timecolor, tag=self._ALL, width=self.pad / 3)
-        angle = pi / 2 - pi / 30 * (m + s / 60.0)
+        angle = pi / 2 - pi / 30 * (minute + second_offset / 60.0)
         x, y = cos(angle) * 0.90, sin(angle) * 0.90
         # draw the minute handle
         scl(self.T.windowToViewport(0, 0, x, y), fill=self.timecolor, tag=self._ALL, width=self.pad / 5)
-        # angle = pi / 2 - pi / 30 * s
+        # angle = pi / 2 - pi / 30 * second
         # x, y = cos(angle) * 0.95, sin(angle) * 0.95
         # # draw the second handle
         # scl(self.T.windowToViewport(0, 0, x, y), fill=self.timecolor, tag=self._ALL, arrow='last')
@@ -252,17 +265,49 @@ class clock:
         sco = self.canvas.create_oval
         sco(self.T.windowToViewport(-ss + x, -ss + y, ss + x, ss + y), fill=self.circlecolor)
 
-    ## Animates the clock, by redrawing everything after a certain time interval.
-    #
+    @staticmethod
+    def _get_arg_kwarg(target, default, args, kwargs):
+        return_value = default
+        # search args for target
+        for element in args:
+            if type(element) is dict and target in element:
+                    return_value = element.get(target)
+                    break
+        # dictionary takes priority
+        return_value = kwargs.get(target, return_value)
+        return return_value
+
+    def animate(self, *args, **kwargs):
+        delay = self._get_arg_kwarg("delay", 100, args, kwargs)
+        stop_hour_minute = self._get_arg_kwarg("stop_hour_minute", None, args, kwargs)
+        if stop_hour_minute is not None:
+            if stop_hour_minute == (self.hour, self.minute):
+                return
+        self.minute += 1
+        if self.minute == 60:
+            self.minute = 0
+            self.hour += 1
+            self.hour %= 12
+        self.redraw()
+        self.root.after(delay, self.animate, dict(delay=delay, stop_hour_minute=stop_hour_minute))
+        return
+
     def poll(self):
         correct = 0
         wrong = 0
+
         while True:
-            hour_in = random.randint(0, 11)
-            minute_in = random.randint(0, int(60/MIN_ACC)-1) * MIN_ACC
-            self.DTG = datetime(*YMD, hour=hour_in, minute=minute_in, second=0, microsecond=0)
-            self.redraw()
-            q = QuestionWindow(self.root, title="Question #{}".format(correct+wrong+1), time_answer=self.DTG)
+            self.hour = random.randint(0, 11)
+            self.minute = random.randint(0, int(60/MIN_ACC)-1) * MIN_ACC
+            hour_minute_answer = (int(self.hour), int(self.minute))
+            if self.visualize:
+                self.minute = 0
+                self.animate(delay=1, stop_hour_minute=hour_minute_answer)
+            else:
+                self.redraw()
+            q = QuestionWindow(self.root,
+                               title="Question #{}".format(correct+wrong+1),
+                               time_answer=hour_minute_answer)
             if not q.still_going:
                 break
             if q.correct_answer:
@@ -402,9 +447,9 @@ class QuestionWindow(Dialog):
             )
             self.user_answer = None
         else:
-            messagebox.showinfo(
+            messagebox.showerror(
                 "Sorry",
-                "Sorry, the correct answer was {ca.hour}:{ca.minute:02}".format(ca=self.time_answer)
+                "Sorry, the correct answer was {ca[0]}:{ca[1]:02}".format(ca=self.time_answer)
             )
 
     def validate(self):
@@ -416,7 +461,7 @@ class QuestionWindow(Dialog):
             regex = r'(^[012]?\d)\D?([0-5]\d)$'
             match = re.search(regex, self.e1.get())
             h, m = match.group(1, 2)
-            self.correct_answer = datetime(*YMD, hour=int(h) % 12, minute=int(m), second=0, microsecond=0) == self.time_answer
+            self.correct_answer = (int(h) % 12, int(m)) == self.time_answer
             return True
         except AttributeError:
             pass  # RE failed
@@ -446,33 +491,13 @@ class QuestionWindow(Dialog):
         self.destroy()
 
 
-## Main program for testing.
-#
-#  @param argv time zone, image background flag,
-#         clock width, clock height, create thread flag.
-#
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
-    if len(argv) > 2:
-        try:
-            deltahours = int(argv[1])
-            sImage = (argv[2] == 'True')
-            w = int(argv[3])
-            h = int(argv[4])
-            t = (argv[5] == 'True')
-        except ValueError:
-            print ("A timezone is expected.")
-            return 1
-    else:
-        deltahours = 3
-        sImage = True
-        w = h = 400
-        t = False
+def main():
+    width = height = 400
+    use_thread = False
 
     root = Tk()
     root.geometry('+0+0')
-    clock(root, deltahours, sImage, w, h, t)
+    ClockTest(root, width, height, use_thread, demo=False, visualize=True)
 
     root.mainloop()
 
