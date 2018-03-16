@@ -22,10 +22,7 @@ from math import sin, cos, pi
 from threading import Thread
 import random
 
-MIN_ACC = 60  # minute accuracy
-YMD = (2018, 1, 1)  # default year month day to always use
-MIN_DEMO = 0
-HOUR_DEMO = 0
+MIN_ACC = 15  # minute accuracy
 
 if sys.version_info.major == 3:
     from tkinter import *  # python 3
@@ -447,9 +444,12 @@ class QuestionWindow(Dialog):
             )
             self.user_answer = None
         else:
+            ca = list(self.time_answer)  # list to be mutable
+            if ca[0] == 0:
+                ca[0] = 12
             messagebox.showerror(
                 "Sorry",
-                "Sorry, the correct answer was {ca[0]}:{ca[1]:02}".format(ca=self.time_answer)
+                "Sorry, the correct answer was {ca[0]}:{ca[1]:02}".format(ca=ca)
             )
 
     def validate(self):
@@ -460,8 +460,11 @@ class QuestionWindow(Dialog):
         try:
             regex = r'(^[012]?\d)\D?([0-5]\d)$'
             match = re.search(regex, self.e1.get())
-            h, m = match.group(1, 2)
-            self.correct_answer = (int(h) % 12, int(m)) == self.time_answer
+            h, m = (int(x) for x in match.group(1, 2))
+            # 2400 is valid, but that's it
+            if (h == 24 and m > 0) or h > 24:
+                return False
+            self.correct_answer = (h % 12, m) == self.time_answer
             return True
         except AttributeError:
             pass  # RE failed
