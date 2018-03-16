@@ -18,12 +18,11 @@
 #  @see http://orion.lcg.ufrj.br/python/figuras/fluminense.png
 import sys
 import os
-from datetime import timedelta, datetime
 from math import sin, cos, pi
 from threading import Thread
 import random
 
-MIN_ACC = 5  # minute accuracy
+MIN_ACC = 60  # minute accuracy
 YMD = (2018, 1, 1)  # default year month day to always use
 MIN_DEMO = 0
 HOUR_DEMO = 0
@@ -282,6 +281,7 @@ class ClockTest:
         stop_hour_minute = self._get_arg_kwarg("stop_hour_minute", None, args, kwargs)
         if stop_hour_minute is not None:
             if stop_hour_minute == (self.hour, self.minute):
+                self.redraw()
                 return
         self.minute += 1
         if self.minute == 60:
