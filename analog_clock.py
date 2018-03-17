@@ -22,7 +22,11 @@ from math import sin, cos, pi
 from threading import Thread
 import random
 
-MIN_ACC = 15  # minute accuracy
+MIN_ACC = 60  # minute accuracy
+if '-l1' in sys.argv:
+    MIN_ACC = 15
+if '-l2' in sys.argv:
+    MIN_ACC = 5
 
 if sys.version_info.major == 3:
     from tkinter import *  # python 3
@@ -159,7 +163,7 @@ class ClockTest:
 
         if kwargs.get("demo"):
             # demo is animation with no end in sight
-            self.animate(delay=50)
+            self.animate(delay=100)
 
         else:
             if useThread:
@@ -449,7 +453,7 @@ class QuestionWindow(Dialog):
                 ca[0] = 12
             messagebox.showerror(
                 "Sorry",
-                "Sorry, the correct answer was {ca[0]}:{ca[1]:02}".format(ca=ca)
+                "Sorry, the correct answer was {ca[0]}:{ca[1]:02}!\nYou entered {ua}.".format(ca=ca, ua=self.e1.get())
             )
 
     def validate(self):
@@ -500,7 +504,7 @@ def main():
 
     root = Tk()
     root.geometry('+0+0')
-    ClockTest(root, width, height, use_thread, demo=False, visualize=True)
+    ClockTest(root, width, height, use_thread, demo='-d' in sys.argv, visualize='-v' in sys.argv)
 
     root.mainloop()
 
