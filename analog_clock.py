@@ -24,8 +24,10 @@ import random
 
 MIN_ACC = 60  # minute accuracy
 if '-l1' in sys.argv:
-    MIN_ACC = 15
+    MIN_ACC = 30
 if '-l2' in sys.argv:
+    MIN_ACC = 15
+if '-l3' in sys.argv:
     MIN_ACC = 5
 
 if sys.version_info.major == 3:
@@ -291,7 +293,6 @@ class ClockTest:
             self.hour %= 12
         self.redraw()
         self.root.after(delay, self.animate, dict(delay=delay, stop_hour_minute=stop_hour_minute))
-        return
 
     def poll(self):
         correct = 0
